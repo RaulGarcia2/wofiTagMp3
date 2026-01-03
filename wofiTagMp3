@@ -1,0 +1,136 @@
+#!/usr/bin/env python3
+import subprocess as s
+import os
+import eyed3
+from eyed3.id3 import TagException
+import sys
+
+WOFI_CFG=os.path.expanduser("~/.config/wofi/bluethink/style.css")
+WOFI=["wofi", "-W", "450", "--show", "dmenu", "-s", WOFI_CFG]
+
+def _analizaFicheros(ficheros)->[]:
+    res=[]
+    
+    for f in ficheros:
+        if os.path.isfile(f):
+            if f.split('.')[-1].lower() == 'mp3':
+                res.append(f)
+    return res
+
+class EtiquetaMp3():
+    def __init__(self, fichero: []):
+        self.ficheros=_analizaFicheros(fichero)
+        self.fecha=0
+        self.artista=''
+        self.album=''
+        self.genero=''
+        self.artistaAlbum=''
+
+        self.idtag={
+            'N': 'track_num',
+            'Titulo': 'title',
+            'Album': 'album',
+            'Artista de Album': 'album_artist',
+            'Genero': 'genre',
+            'Fecha': 'recording_date'
+        }
+
+    def tagFichero(self, nombre:str)->{}:
+        audiofile = eyed3.load(nombre)
+        res={
+            'N': audiofile.tag.track_num.count,
+            'Titulo': audiofile.tag.title,
+            'Album': audiofile.tag.album,
+            'Artista de Album': audiofile.tag.album_artist,
+            'Genero': audiofile.tag.genre,
+            'Fecha': audiofile.tag.recording_date
+        }
+        return res
+
+    @property
+    def tagGeneral(self)->{}:
+        # Generamos un menu para Album, Fecha, Genero, Artista Album
+        # Ponemos por defecto las propiedades del primer fichero
+        fichero=self.ficheros[0]
+        audiofile = eyed3.load(fichero)
+        res={
+        'Album': audiofile.tag.album,
+        'Artista de Album': audiofile.tag.album_artist,
+        'Genero': audiofile.tag.genre,
+        'Fecha': audiofile.tag.recording_date
+        }
+        return res
+
+    def grabaEtiquetas(self, fichero:str='', etiquetas:dict={}):
+        audiofile = eyed3.load(fichero)
+        try:
+            for i in list(etiquetas.keys()):
+                setattr(audiofile.tag, self.idtag[i], etiquetas[i])
+
+            audiofile.tag.save(version=eyed3.id3.ID3_V2_3)
+        except TagException as e:
+            print(f"✗ Error en etiquetas ID3: {e}")
+            return False
+        except Exception as e:
+            print(f"✗ Error inesperado: {type(e).__name__}: {e}")
+            return False
+
+        return 1
+
+    def menuPropiedades(self)->dict:
+        aceptar=False
+        res={}
+        if len(self.ficheros)>1:
+            tag=self.tagGeneral
+        else:
+            tag=self.tagFichero(self.ficheros[0])
+
+        while not aceptar:
+            entradas=[f'{x}: {tag[x]}' for x in tag]
+            _=['󰳻  Aceptar']+entradas
+            _='\n'.join(_)
+            menu = s.run(
+                WOFI+["--prompt", "Cambiar Propiedad fichero:"],
+                input=_,
+                capture_output=True,
+                text=True
+            )
+
+            if menu.returncode != 0:
+                return {}
+
+            if menu.stdout.strip().lower() == '󰳻  aceptar':
+                aceptar=True
+                continue
+
+            dato=menu.stdout.strip().split(':')
+            propiedad=dato[0].strip()
+            valor=dato[1].strip()
+
+            menu2 = s.run(
+                WOFI+["--prompt", f"Cambiar {propiedad}:"],
+                input='\n'.join(['  Atrás', f"{valor}"]),
+                capture_output=True,
+                text=True
+            )
+            if menu2.returncode != 0:
+                continue
+
+            dato=menu2.stdout.strip()
+            if dato=='  Atrás':
+                continue
+            res[propiedad]=dato
+            tag[propiedad]=dato
+            #if menu.returncode == 0:
+            #    return menu.stdout.strip()
+
+        return res
+
+
+if __name__ == "__main__":
+    ficheros=sys.argv[1:]
+    etiqueta_mp3 = EtiquetaMp3(ficheros)
+
+    modifica=etiqueta_mp3.menuPropiedades()
+    for fichero in etiqueta_mp3.ficheros:
+        etiqueta_mp3.grabaEtiquetas(fichero=fichero, etiquetas=modifica)
