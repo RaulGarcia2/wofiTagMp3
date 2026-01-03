@@ -63,9 +63,16 @@ class EtiquetaMp3():
 
     def grabaEtiquetas(self, fichero:str='', etiquetas:dict={}):
         audiofile = eyed3.load(fichero)
+        if audiofile.tag is None:
+            audiofile.initTag()
         try:
             for i in list(etiquetas.keys()):
-                setattr(audiofile.tag, self.idtag[i], etiquetas[i])
+                valor = etiquetas[i]
+                # Caso especial para fecha
+                if self.idtag[i] == 'recording_date':
+                    audiofile.tag.recording_date = valor # OJO: Validar formato YYYY
+                else:
+                    setattr(audiofile.tag, self.idtag[i], valor)
 
             audiofile.tag.save(version=eyed3.id3.ID3_V2_3)
         except TagException as e:
@@ -75,7 +82,7 @@ class EtiquetaMp3():
             print(f"✗ Error inesperado: {type(e).__name__}: {e}")
             return False
 
-        return 1
+        return True
 
     def menuPropiedades(self)->dict:
         aceptar=False
@@ -134,3 +141,8 @@ if __name__ == "__main__":
     modifica=etiqueta_mp3.menuPropiedades()
     for fichero in etiqueta_mp3.ficheros:
         etiqueta_mp3.grabaEtiquetas(fichero=fichero, etiquetas=modifica)
+
+ficheros=[x.split('/')[-1] for x in etiqueta_mp3.ficheros]
+s.run(
+    ['notify-send', '-i', "audio-x-generic", "MP3", f"Cambiadas etiquetas a {', '.join(ficheros)}"]
+)
