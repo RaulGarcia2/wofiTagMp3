@@ -8,14 +8,6 @@ import sys
 WOFI_CFG=os.path.expanduser("~/.config/wofi/bluethink/style.css")
 WOFI=["wofi", "-W", "450", "--show", "dmenu", "-s", WOFI_CFG]
 
-'''
-WOFI=["fzf", "--height", "40%",
-      "--layout", "reverse",
-      "--border",
-      "--inline-info",
-      "<"
-      ]'''
-
 def _analizaFicheros(ficheros)->[]:
     res=[]
     
