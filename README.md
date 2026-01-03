@@ -25,3 +25,4 @@ play = [
   .....
 ]
 ```
+Si seleccionamos algún fichero tipo mp3, al pulsar "O" nos aparecerá un menú en el que escoguiendo la opción 'Poner etiquetas mp3 a ficheros de audio' se ejecutará la aplicación.
