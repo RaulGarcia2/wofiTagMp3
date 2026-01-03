@@ -8,6 +8,14 @@ import sys
 WOFI_CFG=os.path.expanduser("~/.config/wofi/bluethink/style.css")
 WOFI=["wofi", "-W", "450", "--show", "dmenu", "-s", WOFI_CFG]
 
+'''
+WOFI=["fzf", "--height", "40%",
+      "--layout", "reverse",
+      "--border",
+      "--inline-info",
+      "<"
+      ]'''
+
 def _analizaFicheros(ficheros)->[]:
     res=[]
     
@@ -139,10 +147,26 @@ if __name__ == "__main__":
     etiqueta_mp3 = EtiquetaMp3(ficheros)
 
     modifica=etiqueta_mp3.menuPropiedades()
-    for fichero in etiqueta_mp3.ficheros:
-        etiqueta_mp3.grabaEtiquetas(fichero=fichero, etiquetas=modifica)
+    res=[]
+    if modifica != {}:
+        for fichero in etiqueta_mp3.ficheros:
+            res.append(etiqueta_mp3.grabaEtiquetas(fichero=fichero, etiquetas=modifica))
 
-    ficheros=[x.split('/')[-1] for x in etiqueta_mp3.ficheros]
-    s.run(
-        ['notify-send', '-i', "audio-x-generic", "MP3", f"Cambiadas etiquetas a {', '.join(ficheros)}"]
-    )
+        ficheros=[x.split('/')[-1] for x in etiqueta_mp3.ficheros]
+
+    bien=[]
+    mal=[]
+    for n, m in enumerate(res):
+        if m:
+            bien.append(ficheros[n])
+        else:
+            mal.append(ficheros[n])
+
+    if len(bien)>0:
+        s.run(
+            ['notify-send', '-a', 'Mp3', '-i', "audio-x-generic", "MP3", f"Cambiadas etiquetas a {', '.join(bien)}"]
+        )
+    if len(mal)>0:
+        s.run(
+            ['notify-send', '-a', 'Mp3', '-i', "audio-x-generic", "MP3", f"✗ Error en {', '.join(mal)}"]
+        )
