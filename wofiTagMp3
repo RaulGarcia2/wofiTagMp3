@@ -142,7 +142,7 @@ if __name__ == "__main__":
     for fichero in etiqueta_mp3.ficheros:
         etiqueta_mp3.grabaEtiquetas(fichero=fichero, etiquetas=modifica)
 
-ficheros=[x.split('/')[-1] for x in etiqueta_mp3.ficheros]
-s.run(
-    ['notify-send', '-i', "audio-x-generic", "MP3", f"Cambiadas etiquetas a {', '.join(ficheros)}"]
-)
+    ficheros=[x.split('/')[-1] for x in etiqueta_mp3.ficheros]
+    s.run(
+        ['notify-send', '-i', "audio-x-generic", "MP3", f"Cambiadas etiquetas a {', '.join(ficheros)}"]
+    )
