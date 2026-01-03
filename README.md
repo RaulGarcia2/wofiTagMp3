@@ -8,6 +8,11 @@ Se debe tener instalado:
 ## Instalación
 Copiar el fichero *wofiTagMp3* en _$HOME/.local/bin_ o en otra carpeta dentro de la variable _$PATH_
 
+Asegurarnos que el fichero copiado tiene permisos de ejecución:
+```
+chmod +x $PATH/.local/bin/wofiTagMp3
+```
+
 En el fichero está definida una configuración para que el menú wofi aparezca con un estilo, se deberá cambiar al gusto del usuario.
 
 ## Utilización
