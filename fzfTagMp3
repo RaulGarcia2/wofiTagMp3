@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+import subprocess as s
+import os
+import eyed3
+from eyed3.id3 import TagException
+import sys
+
+# Configuración de fzf para la interfaz de terminal
+FZF_CMD = ["fzf", "--height=15", "--reverse", "--border", "--info=inline"]
+
+def _analizaFicheros(ficheros) -> list:
+    """Filtra la lista para devolver solo archivos mp3 existentes."""
+    res = []
+    for f in ficheros:
+        if os.path.isfile(f) and f.lower().endswith('.mp3'):
+            res.append(f)
+    return res
+
+class EtiquetaMp3():
+    def __init__(self, fichero: list):
+        self.ficheros = _analizaFicheros(fichero)
+        self.idtag = {
+            'N': 'track_num',
+            'Titulo': 'title',
+            'Album': 'album',
+            'Artista de Album': 'album_artist',
+            'Genero': 'genre',
+            'Fecha': 'recording_date'
+        }
+
+    def tagFichero(self, nombre: str) -> dict:
+        audiofile = eyed3.load(nombre)
+        return {
+            'N': audiofile.tag.track_num.count if audiofile.tag.track_num else "",
+            'Titulo': audiofile.tag.title,
+            'Album': audiofile.tag.album,
+            'Artista de Album': audiofile.tag.album_artist,
+            'Genero': audiofile.tag.genre,
+            'Fecha': str(audiofile.tag.recording_date) if audiofile.tag.recording_date else ""
+        }
+
+    @property
+    def tagGeneral(self) -> dict:
+        """Obtiene metadatos del primer archivo para edición por lote."""
+        if not self.ficheros: return {}
+        audiofile = eyed3.load(self.ficheros[0])
+        return {
+            'Album': audiofile.tag.album,
+            'Artista de Album': audiofile.tag.album_artist,
+            'Genero': audiofile.tag.genre,
+            'Fecha': str(audiofile.tag.recording_date) if audiofile.tag.recording_date else ""
+        }
+
+    def grabaEtiquetas(self, fichero: str = '', etiquetas: dict = {}):
+        audiofile = eyed3.load(fichero)
+        if audiofile.tag is None:
+            audiofile.initTag()
+        try:
+            for i, valor in etiquetas.items():
+                if self.idtag[i] == 'recording_date':
+                    audiofile.tag.recording_date = valor
+                else:
+                    setattr(audiofile.tag, self.idtag[i], valor)
+            audiofile.tag.save(version=eyed3.id3.ID3_V2_3)
+            return True
+        except (TagException, Exception) as e:
+            print(f"✗ Error en {fichero}: {e}")
+            return False
+
+    def _ejecutar_fzf(self, opciones: list, prompt: str, multi: bool = False) -> list:
+        """Llamada genérica a fzf."""
+        cmd = FZF_CMD + ["--prompt", prompt]
+        if multi:
+            cmd.append("-m")
+        
+        proceso = s.run(cmd, input='\n'.join(opciones), capture_output=True, text=True)
+        if proceso.returncode != 0:
+            return []
+        return proceso.stdout.strip().split('\n')
+
+    def menuPropiedades(self) -> dict:
+        res = {}
+        tag = self.tagGeneral if len(self.ficheros) > 1 else self.tagFichero(self.ficheros[0])
+
+        while True:
+            entradas = [f'{k}: {v}' for k, v in tag.items()]
+            opciones = ['󰳻  Aceptar'] + entradas
+            
+            seleccion = self._ejecutar_fzf(opciones, "Editar Propiedad > ")
+            if not seleccion or not seleccion[0]: return {}
+            if seleccion[0] == '󰳻  Aceptar': break
+
+            propiedad = seleccion[0].split(':')[0].strip()
+            valor_actual = tag.get(propiedad, "")
+
+            print(f"\033[H\033[J\nModificando: {propiedad}")
+            nuevo_valor = input(f"Nuevo valor [{valor_actual}]: ").strip()
+            if nuevo_valor == "":
+                nuevo_valor = valor_actual
+
+            if nuevo_valor:
+                res[propiedad] = nuevo_valor
+                tag[propiedad] = nuevo_valor
+            print("\033[H\033[J")
+
+        return res
+
+if __name__ == "__main__":
+    args = sys.argv[1:]
+    
+    # Selección de archivos con fzf si no se pasan argumentos
+    if not args or os.path.isdir(sys.argv[-1]):
+        directorio='.' if not args else sys.argv[-1]
+        os.chdir(directorio)
+        mp3s = [f for f in os.listdir('.') if f.lower().endswith('.mp3')]
+        if not mp3s:
+            print("No hay archivos MP3 en el directorio actual.")
+            sys.exit(0)
+        
+        selector = EtiquetaMp3([])
+        args = selector._ejecutar_fzf(mp3s, "Selecciona archivos (TAB para multi) > ", multi=True)
+        if not args or args == ['']: sys.exit(0)
+
+    app = EtiquetaMp3(args)
+    cambios = app.menuPropiedades()
+    
+    if cambios:
+        exitos, fallos = [], []
+        for f in app.ficheros:
+            if app.grabaEtiquetas(f, cambios):
+                exitos.append(os.path.basename(f))
+            else:
+                fallos.append(os.path.basename(f))
+
+        if exitos:
+            s.run(['notify-send', '-a', 'Mp3', 'Éxito', f"Editados: {', '.join(exitos)}"])
+        if fallos:
+            s.run(['notify-send', '-a', 'Mp3', 'Error', f"Fallaron: {', '.join(fallos)}"])
